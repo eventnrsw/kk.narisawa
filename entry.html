@@ -11,7 +11,7 @@
         h2 { text-align: center; color: #2c3e50; }
         .form-group { margin-bottom: 16px; }
         label { display: block; margin-bottom: 6px; font-weight: bold; }
-        input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; background-color: #fff; }
         button { width: 100%; padding: 12px; background-color: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         button:hover { background-color: #2980b9; }
         .link-area { text-align: center; margin-top: 15px; }
@@ -27,7 +27,6 @@
 <body>
 
 <div class="container">
-    <!-- 1. 通常登録画面 -->
     <div id="register-view" class="view-section active">
         <h2>参加登録フォーム</h2>
         <form id="regForm">
@@ -37,6 +36,19 @@
             <div class="form-group"><label>お氏名</label><input type="text" id="name" required></div>
             <div class="form-group"><label>メールアドレス</label><input type="email" id="email" required></div>
             <div class="form-group"><label>電話番号</label><input type="tel" id="phone"></div>
+            <div class="form-group">
+                <label>予定時刻</label>
+                <select id="timeSlot" required>
+                    <option value="" disabled selected>選択してください</option>
+                    <option value="10:00">10:00</option>
+                    <option value="11:00">11:00</option>
+                    <option value="12:00">12:00</option>
+                    <option value="13:00">13:00</option>
+                    <option value="14:00">14:00</option>
+                    <option value="15:00">15:00</option>
+                    <option value="16:00">16:00</option>
+                </select>
+            </div>
             <button type="submit" id="submitBtn">登録</button>
         </form>
         <div class="link-area">
@@ -44,7 +56,6 @@
         </div>
     </div>
 
-    <!-- 2. 再発行画面（メアド入力のみ） -->
     <div id="reissue-view" class="view-section">
         <h2>QRコード再発行</h2>
         <p style="font-size: 14px; color: #666; text-align: center;">ご登録いただいたメールアドレスを入力してください。</p>
@@ -60,7 +71,6 @@
         </div>
     </div>
 
-    <!-- 3. 共通のQRコード・結果表示エリア -->
     <div id="result-area" style="display: none;">
         <h3 id="statusMsg"></h3>
         <p>ＱＲコードは当日受付でご提示頂きます</p>
@@ -112,7 +122,8 @@
             position: document.getElementById('position').value,
             name: document.getElementById('name').value,
             email: document.getElementById('email').value,
-            phone: document.getElementById('phone').value
+            phone: document.getElementById('phone').value,
+            timeSlot: document.getElementById('timeSlot').value
         };
 
         sendData(formData);
@@ -156,7 +167,8 @@
                     <strong>登録番号:</strong> ${data.regId}<br>
                     <strong>タイムスタンプ:</strong> ${data.timestamp}<br>
                     ${data.company ? `<strong>社名:</strong> ${data.company}<br>` : ''}
-                    ${data.name ? `<strong>氏名:</strong> ${data.name}` : ''}
+                    ${data.name ? `<strong>氏名:</strong> ${data.name}<br>` : ''}
+                    ${data.timeSlot ? `<strong>予定時刻:</strong> ${data.timeSlot}` : ''}
                 `;
 
                 qrContainer.innerHTML = "";
