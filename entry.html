@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>参加登録・QR再発行</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f6f9; padding: 20px; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        h2 { text-align: center; color: #2c3e50; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; margin-bottom: 6px; font-weight: bold; }
+        input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background-color: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #2980b9; }
+        .link-area { text-align: center; margin-top: 15px; }
+        .link-area a { color: #3498db; text-decoration: none; font-size: 14px; cursor: pointer; }
+        .link-area a:hover { text-decoration: underline; }
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+        #result-area { margin-top: 24px; padding: 20px; background: #eef9ff; text-align: center; border-radius: 6px; }
+        #qrcode { display: inline-block; margin: 15px 0; padding: 10px; background: white; border: 1px solid #ddd; cursor: pointer; }
+        .download-hint { font-size: 12px; color: #666; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 1. 通常登録画面 -->
+    <div id="register-view" class="view-section active">
+        <h2>参加登録フォーム</h2>
+        <form id="regForm">
+            <div class="form-group"><label>御社名</label><input type="text" id="company" required></div>
+            <div class="form-group"><label>部署</label><input type="text" id="department"></div>
+            <div class="form-group"><label>役職</label><input type="text" id="position"></div>
+            <div class="form-group"><label>お氏名</label><input type="text" id="name" required></div>
+            <div class="form-group"><label>メールアドレス</label><input type="email" id="email" required></div>
+            <div class="form-group"><label>電話番号</label><input type="tel" id="phone"></div>
+            <button type="submit" id="submitBtn">登録</button>
+        </form>
+        <div class="link-area">
+            <a id="toReissueLink">登録済みのお客様はこちら（QRコード再発行）</a>
+        </div>
+    </div>
+
+    <!-- 2. 再発行画面（メアド入力のみ） -->
+    <div id="reissue-view" class="view-section">
+        <h2>QRコード再発行</h2>
+        <p style="font-size: 14px; color: #666; text-align: center;">ご登録いただいたメールアドレスを入力してください。</p>
+        <form id="reissueForm">
+            <div class="form-group">
+                <label>メールアドレス</label>
+                <input type="email" id="reissueEmail" required>
+            </div>
+            <button type="submit" id="reissueBtn">QRコードを再発行する</button>
+        </form>
+        <div class="link-area">
+            <a id="toRegisterLink">新規登録画面に戻る</a>
+        </div>
+    </div>
+
+    <!-- 3. 共通のQRコード・結果表示エリア -->
+    <div id="result-area" style="display: none;">
+        <h3 id="statusMsg"></h3>
+        <p>ＱＲコードは当日受付でご提示頂きます</p>
+        <p>必ずダウンロードして保存してください</p>
+        
+        <div id="qrcode" title="クリックしてダウンロード"></div>
+        <div class="download-hint">※QRコードをクリックして保存</div>
+
+        <div class="info-list" id="infoList" style="text-align: left; margin-top: 15px; font-size: 14px; line-height: 1.6;"></div>
+        
+        <button type="button" onclick="location.reload()" style="margin-top: 20px; background-color: #7f8c8d;">最初に戻る</button>
+    </div>
+</div>
+
+<script>
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwiogCk79iAsjRyeznlTL4moSD215m7ebLGx8lOA4v752_FmM1TelCdzkc2S-z_D7A4/exec";
+
+    const registerView = document.getElementById('register-view');
+    const reissueView = document.getElementById('reissue-view');
+    const resultArea = document.getElementById('result-area');
+    
+    const toReissueLink = document.getElementById('toReissueLink');
+    const toRegisterLink = document.getElementById('toRegisterLink');
+
+    let generatedRegId = "";
+    const qrContainer = document.getElementById('qrcode');
+
+    // 画面切り替えのイベント
+    toReissueLink.addEventListener('click', () => {
+        registerView.classList.remove('active');
+        reissueView.classList.add('active');
+    });
+
+    toRegisterLink.addEventListener('click', () => {
+        reissueView.classList.remove('active');
+        registerView.classList.add('active');
+    });
+
+    // 通常登録送信
+    document.getElementById('regForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.textContent = "送信中...";
+
+        const formData = {
+            company: document.getElementById('company').value,
+            department: document.getElementById('department').value,
+            position: document.getElementById('position').value,
+            name: document.getElementById('name').value,
+            email: document.getElementById('email').value,
+            phone: document.getElementById('phone').value
+        };
+
+        sendData(formData);
+    });
+
+    // 再発行送信
+    document.getElementById('reissueForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const reissueBtn = document.getElementById('reissueBtn');
+        reissueBtn.disabled = true;
+        reissueBtn.textContent = "検索中...";
+
+        const formData = {
+            action: "reissue",
+            email: document.getElementById('reissueEmail').value
+        };
+
+        sendData(formData, reissueBtn, "QRコードを再発行する");
+    });
+
+    // 共通の通信処理
+    function sendData(formData, btnToReset = null, defaultBtnText = "") {
+        fetch(WEB_APP_URL, {
+            method: 'POST',
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.status === "success") {
+                generatedRegId = data.regId;
+                
+                let titleText = "登録が完了しました";
+                if (formData.action === "reissue") {
+                    titleText = "QRコードを再発行しました";
+                } else if (data.isNew === false) {
+                    titleText = "既に登録済みです";
+                }
+
+                document.getElementById('statusMsg').textContent = titleText;
+                document.getElementById('infoList').innerHTML = `
+                    <strong>登録番号:</strong> ${data.regId}<br>
+                    <strong>タイムスタンプ:</strong> ${data.timestamp}<br>
+                    ${data.company ? `<strong>社名:</strong> ${data.company}<br>` : ''}
+                    ${data.name ? `<strong>氏名:</strong> ${data.name}` : ''}
+                `;
+
+                qrContainer.innerHTML = "";
+                new QRCode(qrContainer, {
+                    text: data.regId,
+                    width: 150,
+                    height: 150
+                });
+
+                registerView.classList.remove('active');
+                reissueView.classList.remove('active');
+                resultArea.style.display = "block";
+            } else {
+                alert("エラー: " + data.message);
+                if(btnToReset) {
+                    btnToReset.disabled = false;
+                    btnToReset.textContent = defaultBtnText;
+                } else {
+                    document.getElementById('submitBtn').disabled = false;
+                    document.getElementById('submitBtn').textContent = "登録";
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert("通信エラーが発生しました。");
+            location.reload();
+        });
+    }
+
+    // QRコードダウンロード
+    qrContainer.addEventListener('click', function() {
+        const img = qrContainer.querySelector('img');
+        const canvas = qrContainer.querySelector('canvas');
+        let imageUrl = img ? img.src : (canvas ? canvas.toDataURL("image/png") : "");
+
+        if (imageUrl) {
+            const link = document.createElement('a');
+            link.href = imageUrl;
+            link.download = `qrcode_${generatedRegId}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    });
+</script>
+
+</body>
+</html>

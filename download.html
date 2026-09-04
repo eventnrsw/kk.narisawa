@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>データ管理パネル</title>
+    <style>
+      body { 
+        font-family: sans-serif; 
+        padding: 40px; 
+        line-height: 1.6; 
+        background-color: #f9f9f9;
+        color: #333;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        background: #fff;
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      h1 { font-size: 24px; margin-bottom: 20px; color: #2c3e50; }
+      .button-group {
+        display: flex;
+        gap: 15px;
+        margin-top: 20px;
+      }
+      button { 
+        padding: 12px 24px; 
+        cursor: pointer; 
+        border-radius: 4px; 
+        font-size: 16px; 
+        border: none; 
+        font-weight: bold;
+        transition: opacity 0.2s;
+      }
+      button:hover { opacity: 0.85; }
+      .btn-download { background-color: #4CAF50; color: white; }
+      .btn-clear { background-color: #f44336; color: white; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>データ管理パネル</h1>
+      <p>スプレッドシートのデータのダウンロードや一括削除が行えます。</p>
+      
+      <div class="button-group">
+        <button class="btn-download" onclick="downloadCsv()">CSVダウンロード</button>
+        <button class="btn-clear" onclick="clearData()">全データ削除</button>
+      </div>
+    </div>
+
+    <script>
+      // ご自身のGASのウェブアプリのURLを指定してください
+      const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwiogCk79iAsjRyeznlTL4moSD215m7ebLGx8lOA4v752_FmM1TelCdzkc2S-z_D7A4/exec";
+
+      // CSVダウンロード処理
+      function downloadCsv() {
+        fetch(WEB_APP_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: "getCsv" })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.status === "success") {
+            const csv = data.csv;
+            if (!csv) {
+              alert('データが存在しません。');
+              return;
+            }
+            // BOMを付与してUTF-8でダウンロード（Excelでの文字化け防止）
+            const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], {type: 'text/csv'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'spreadsheet_data.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+          } else {
+            alert('エラーが発生しました: ' + data.message);
+          }
+        })
+        .catch(error => {
+          alert('通信エラーが発生しました: ' + error);
+        });
+      }
+
+      // データ削除処理（パスワード認証付き）
+      function clearData() {
+        const password = document.prompt ? prompt('データを削除するにはパスワードを入力してください：') : window.prompt('データを削除するにはパスワードを入力してください：');
+        
+        if (password === null) {
+          return; // キャンセルされた場合
+        }
+        
+        if (password !== '1234') {
+          alert('パスワードが間違っています。');
+          return;
+        }
+
+        if (confirm('本当に全てのデータを削除しますか？\nこの操作は元に戻せません。')) {
+          fetch(WEB_APP_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: "clearData", password: password })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.status === "success") {
+              alert('削除が完了しました。');
+            } else {
+              alert('削除に失敗しました: ' + data.message);
+            }
+          })
+          .catch(error => {
+            alert('通信エラーが発生しました: ' + error);
+          });
+        }
+      }
+    </script>
+  </body>
+</html>
