@@ -23,6 +23,7 @@
       h1 { font-size: 24px; margin-bottom: 20px; color: #2c3e50; }
       .button-group {
         display: flex;
+        flex-direction: column;
         gap: 15px;
         margin-top: 20px;
       }
@@ -37,6 +38,7 @@
       }
       button:hover { opacity: 0.85; }
       .btn-download { background-color: #4CAF50; color: white; }
+      .btn-custom { background-color: #2196F3; color: white; }
       .btn-clear { background-color: #f44336; color: white; }
     </style>
   </head>
@@ -46,7 +48,8 @@
       <p>スプレッドシートのデータのダウンロードや一括削除が行えます。</p>
       
       <div class="button-group">
-        <button class="btn-download" onclick="downloadCsv()">CSVダウンロード</button>
+        <button class="btn-download" onclick="downloadCsv()">CSVダウンロード（全体）</button>
+        <button class="btn-custom" onclick="downloadCustomCsv()">個別CSVダウンロード（I列→A列, B列→B列）</button>
         <button class="btn-clear" onclick="clearData()">全データ削除</button>
       </div>
     </div>
@@ -55,7 +58,7 @@
       // ご自身のGASのウェブアプリのURLを指定してください
       const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwAzqoxdot3vhkwplGctF8a8TL3-16EXhaXOGhpYsvUfXS9SdrZv-aVg0HkqGU-YvzQ/exec";
 
-      // CSVダウンロード処理
+      // CSVダウンロード処理（全体）
       function downloadCsv() {
         fetch(WEB_APP_URL, {
           method: 'POST',
@@ -75,6 +78,63 @@
             const a = document.createElement('a');
             a.href = url;
             a.download = 'spreadsheet_data.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+          } else {
+            alert('エラーが発生しました: ' + data.message);
+          }
+        })
+        .catch(error => {
+          alert('通信エラーが発生しました: ' + error);
+        });
+      }
+
+      // 個別CSVダウンロード処理（I列をA列に、B列をB列に並び替え）
+      function downloadCustomCsv() {
+        fetch(WEB_APP_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: "getCsv" })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.status === "success") {
+            const csv = data.csv;
+            if (!csv) {
+              alert('データが存在しません。');
+              return;
+            }
+
+            // CSV文字列を簡単な行・列パース（ダブルクォーテーション等を考慮した行分割）
+            const rows = csv.split('\r\n').length > 1 ? csv.split('\r\n') : csv.split('\n');
+            const newRows = [];
+
+            for (let i = 0; i < rows.length; i++) {
+              if (!rows[i].trim()) continue;
+              
+              // カンマ区切りでセルに分割（簡易的なパース）
+              const cols = rows[i].split(',');
+              
+              // インデックス: A列=0, B列=1, I列=8 (0始まり)
+              if (cols.length >= 9) {
+                const valI = cols[8]; // I列
+                const valB = cols[1]; // B列
+                newRows.push([valI, valB].join(','));
+              } else if (cols.length >= 2) {
+                // 列数が足りない場合のフォールバック
+                const valB = cols[1] || '';
+                const valI = cols[cols.length - 1] || '';
+                newRows.push([valI, valB].join(','));
+              }
+            }
+
+            const customCsvContent = newRows.join('\r\n');
+
+            // BOMを付与してUTF-8でダウンロード
+            const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), customCsvContent], {type: 'text/csv'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'custom_filtered_data.csv';
             a.click();
             URL.revokeObjectURL(url);
           } else {
