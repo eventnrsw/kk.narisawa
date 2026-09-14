@@ -333,10 +333,10 @@
 
                     const worksheet = XLSX.utils.aoa_to_sheet(rows);
                     const workbook = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(workbook, worksheet, "登録データ全体");
+                    XLSX.utils.book_append_sheet(workbook, worksheet, "エントリーリスト");
 
                     const now = new Date();
-                    const fileName = `登録データ全体_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.xlsx`;
+                    const fileName = `エントリーリスト_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.xlsx`;
 
                     hideLoading();
                     XLSX.writeFile(workbook, fileName);
