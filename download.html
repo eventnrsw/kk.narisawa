@@ -1,183 +1,532 @@
 <!DOCTYPE html>
 <html lang="ja">
-  <head>
+<head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登録内容確認</title>
+    <title>統合データ管理パネル</title>
+    <!-- Excel出力用ライブラリ (SheetJS) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-      body { 
-        font-family: sans-serif; 
-        padding: 40px; 
-        line-height: 1.6; 
-        background-color: #f9f9f9;
-        color: #333;
-      }
-      .container {
-        max-width: 600px;
-        margin: 0 auto;
-        background: #fff;
-        padding: 30px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      }
-      h1 { font-size: 24px; margin-bottom: 20px; color: #2c3e50; }
-      .button-group {
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-        margin-top: 20px;
-      }
-      button { 
-        padding: 12px 24px; 
-        cursor: pointer; 
-        border-radius: 4px; 
-        font-size: 16px; 
-        border: none; 
-        font-weight: bold;
-        transition: opacity 0.2s;
-      }
-      button:hover { opacity: 0.85; }
-      .btn-download { background-color: #4CAF50; color: white; }
-      .btn-custom { background-color: #2196F3; color: white; }
-      .btn-clear { background-color: #f44336; color: white; }
+        :root {
+            --primary-color: #2196F3;
+            --primary-hover: #1976D2;
+            --success-color: #4CAF50;
+            --success-hover: #388E3C;
+            --danger-color: #f44336;
+            --danger-hover: #d32f2f;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --border-color: #cbd5e1;
+        }
+
+        body { 
+            font-family: system-ui, -apple-system, sans-serif;
+            padding: 20px; 
+            line-height: 1.6; 
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 650px;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            box-sizing: border-box;
+        }
+
+        h1 { font-size: 1.5rem; margin-top: 0; color: #0f172a; border-bottom: 2px solid var(--primary-color); padding-bottom: 8px; }
+        h2 { font-size: 1.15rem; margin-top: 0; color: #334155; }
+        
+        p {
+            font-size: 0.95rem;
+            color: #475569;
+            line-height: 1.5;
+        }
+
+        .section {
+            margin-bottom: 28px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 15px;
+        }
+
+        button { 
+            width: 100%;
+            padding: 12px 20px; 
+            cursor: pointer; 
+            border-radius: 8px; 
+            font-size: 1rem; 
+            border: none; 
+            font-weight: bold;
+            color: white;
+            transition: opacity 0.2s, background-color 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled { background-color: #94a3b8 !important; cursor: not-allowed; }
+
+        .btn-download { background-color: var(--success-color); }
+        .btn-custom { background-color: var(--primary-color); }
+        .btn-clear { background-color: var(--danger-color); }
+
+        /* ローディング用オーバーレイ */
+        #loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #ffffff;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
-  </head>
-  <body>
+</head>
+<body>
+
+    <!-- 読込中オーバーレイ -->
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div id="loading-text">処理中...</div>
+    </div>
+
     <div class="container">
-      <h1>データ管理パネル</h1>
-      <p>スプレッドシートのデータのダウンロードや一括削除が行えます。</p>
-      
-      <div class="button-group">
-        <button class="btn-download" onclick="downloadCsv()">CSVダウンロード（全体）</button>
-        <button class="btn-custom" onclick="downloadCustomCsv()">来場通知用ファイル取得</button>
-        <button class="btn-clear" onclick="clearData()">全データ削除</button>
-      </div>
+        <h1>データ管理パネル</h1>
+        <p>それぞれの登録内容のデータを取得・削除が行えます。</p>
+
+        <!-- ========================================== -->
+        <!-- システム1：登録内容確認・来場通知用パネル -->
+        <!-- ========================================== -->
+        <div class="section">
+            <h2>1. エントリーデータ管理</h2>
+            <p>エントリーリスト取得、来場通知用ファイル取得、一括削除が行えます。</p>
+            <div class="button-group">
+                <button class="btn-download" onclick="downloadExcel1()">エントリーリストダウンロード</button>
+                <button class="btn-custom" onclick="downloadCustomCsv1()">来場通知用ファイル取得(.csv)</button>
+                <button class="btn-clear" onclick="clearData1()">エントリーリスト全データ削除</button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- システム2：コミュニケーションデータ管理 -->
+        <!-- ========================================== -->
+        <div class="section">
+            <h2>2. コミュニケーションデータ管理</h2>
+            <p>コミュニケーション登録データをダウンロードできます。</p>
+            <div class="button-group">
+                <button id="download-excel-btn-2" class="btn-custom" onclick="downloadExcel2()">コミュニケーションデータをダウンロード</button>
+                <button id="delete-excel-btn" class="btn-clear" onclick="clearData2()">コミュニケーションデータ全データ削除</button>
+            </div>
+        </div>
     </div>
 
     <script>
-      // ご自身のGASのウェブアプリのURLを指定してください
-      const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwnyHctArgRJDnSxzd-OVDkCBbjCMCG7OIz41jv3Vg4ibqWpfvGMd-4kv1E08xChjbBAg/exec";
+        // =========================================================
+        // 各GASウェブアプリのURL設定
+        // =========================================================
+        const WEB_APP_URL_1 = "https://script.google.com/macros/s/AKfycbwnyHctArgRJDnSxzd-OVDkCBbjCMCG7OIz41jv3Vg4ibqWpfvGMd-4kv1E08xChjbBAg/exec";
+        const WEB_APP_URL_2 = "https://script.google.com/macros/s/AKfycbwmQUWldL3pywGk1Um8sJI7Te_RPhEeUCK23Gg50GBAey_POp0_8uz9OeFzAi8guRun/exec";
 
-      // CSVダウンロード処理（全体）
-      function downloadCsv() {
-        fetch(WEB_APP_URL, {
-          method: 'POST',
-          body: JSON.stringify({ action: "getCsv" })
-        })
-        .then(response => response.json())
-        .then(data => {
-          if (data.status === "success") {
-            const csv = data.csv;
-            if (!csv) {
-              alert('データが存在しません。');
-              return;
-            }
-            // BOMを付与してUTF-8でダウンロード（Excelでの文字化け防止）
-            const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], {type: 'text/csv'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'spreadsheet_data.csv';
-            a.click();
-            URL.revokeObjectURL(url);
-          } else {
-            alert('エラーが発生しました: ' + data.message);
-          }
-        })
-        .catch(error => {
-          alert('通信エラーが発生しました: ' + error);
-        });
-      }
+        const CORRECT_PASSWORD = "1234";
 
-      // 個別CSVダウンロード処理（H列をA列に、B列をB列に並び替え）
-      function downloadCustomCsv() {
-        fetch(WEB_APP_URL, {
-          method: 'POST',
-          body: JSON.stringify({ action: "getCsv" })
-        })
-        .then(response => response.json())
-        .then(data => {
-          if (data.status === "success") {
-            const csv = data.csv;
-            if (!csv) {
-              alert('データが存在しません。');
-              return;
-            }
+        const EXCEL_HEADERS_2 = [
+            "タイムスタンプ",
+            "出展者",
+            "見本市コード",
+            "質問１",
+            "質問２",
+            "質問３",
+            "メモ（特記事項）"
+        ];
 
-            // CSV文字列を簡単な行・列パース（ダブルクォーテーション等を考慮した行分割）
-            const rows = csv.split('\r\n').length > 1 ? csv.split('\r\n') : csv.split('\n');
-            const newRows = [];
-
-            for (let i = 0; i < rows.length; i++) {
-              if (!rows[i].trim()) continue;
-              
-              // カンマ区切りでセルに分割
-              const cols = rows[i].split(',');
-              
-              // インデックス: B列=1, H列=7 (0始まり)
-              // スプレッドシートの構造: A=0, B=1(御社名), ..., H=7(登録ID)
-              if (cols.length >= 8) {
-                const valH = cols[7]; // H列（登録ID）
-                const valB = cols[1]; // B列（御社名）
-                newRows.push([valH, valB].join(','));
-              } else if (cols.length >= 2) {
-                // 列数が足りない場合のフォールバック
-                const valB = cols[1] || '';
-                const valH = cols[cols.length - 1] || '';
-                newRows.push([valH, valB].join(','));
-              }
-            }
-
-            const customCsvContent = newRows.join('\r\n');
-
-            // BOMを付与してUTF-8でダウンロード
-            const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), customCsvContent], {type: 'text/csv'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'custom_filtered_data.csv';
-            a.click();
-            URL.revokeObjectURL(url);
-          } else {
-            alert('エラーが発生しました: ' + data.message);
-          }
-        })
-        .catch(error => {
-          alert('通信エラーが発生しました: ' + error);
-        });
-      }
-
-      // データ削除処理（パスワード認証付き）
-      function clearData() {
-        const password = document.prompt ? prompt('データを削除するにはパスワードを入力してください：') : window.prompt('データを削除するにはパスワードを入力してください：');
-        
-        if (password === null) {
-          return; // キャンセルされた場合
+        // 共通ローディング制御用
+        function showLoading(text) {
+            document.getElementById('loading-text').innerText = text;
+            document.getElementById('loading-overlay').style.display = 'flex';
         }
-        
-        if (password !== '1234') {
-          alert('パスワードが間違っています。');
-          return;
+        function hideLoading() {
+            document.getElementById('loading-overlay').style.display = 'none';
         }
 
-        if (confirm('本当に全てのデータを削除しますか？\nこの操作は元に戻せません。')) {
-          fetch(WEB_APP_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: "clearData", password: password })
-          })
-          .then(response => response.json())
-          .then(data => {
-            if (data.status === "success") {
-              alert('削除が完了しました。');
+        // 安全なJSONパース（HTMLエラーページが返ってきた場合にわかりやすく検知する）
+        async function parseJsonResponse(response) {
+            const contentType = response.headers.get("content-type");
+            const text = await response.text();
+            
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    throw new Error("JSONのパースに失敗しました: " + text.substring(0, 100));
+                }
             } else {
-              alert('削除に失敗しました: ' + data.message);
+                // HTMLやテキストが返ってきた場合（権限エラーやGASのエラー画面）
+                if (text.includes("<!DOCTYPE html>") || text.includes("<html")) {
+                    throw new Error("GASからHTMLエラー画面が返されました。デプロイの「アクセスできるユーザー」が「全員」になっているか確認してください。");
+                }
+                throw new Error("予期せぬ応答形式です: " + text.substring(0, 100));
             }
-          })
-          .catch(error => {
-            alert('通信エラーが発生しました: ' + error);
-          });
         }
-      }
+
+        // CSVテキストを正しく二次元配列にパースするヘルパー関数
+        function parseCSV(text) {
+            let lines = [];
+            let row = [""];
+            let i = 0;
+            let r = 0;
+            let s = 0; // 0: 通常, 1: ダブルクォーテーション内
+            
+            while (i < text.length) {
+                let c = text[i];
+                let next = text[i + 1];
+                
+                if (s === 0) {
+                    if (c === '"') {
+                        s = 1;
+                    } else if (c === ',') {
+                        row.push("");
+                        r++;
+                    } else if (c === '\r' && next === '\n') {
+                        lines.push(row);
+                        row = [""];
+                        r = 0;
+                        i++;
+                    } else if (c === '\n' || c === '\r') {
+                        lines.push(row);
+                        row = [""];
+                        r = 0;
+                    } else {
+                        row[r] += c;
+                    }
+                } else if (s === 1) {
+                    if (c === '"') {
+                        if (next === '"') {
+                            row[r] += '"';
+                            i++;
+                        } else {
+                            s = 0;
+                        }
+                    } else {
+                        row[r] += c;
+                    }
+                }
+                i++;
+            }
+            if (row.length > 1 || row[0] !== "") {
+                lines.push(row);
+            }
+            return lines;
+        }
+
+        function formatTimestampValue(val) {
+            if (!val) return "";
+            let str = String(val).trim();
+            if (str === "") return "";
+
+            let d = new Date(str);
+            if (!isNaN(d.getTime())) {
+                if (d.getFullYear() > 1970) {
+                    let yyyy = d.getFullYear();
+                    let mm = String(d.getMonth() + 1).padStart(2, '0');
+                    let dd = String(d.getDate()).padStart(2, '0');
+                    let hh = String(d.getHours()).padStart(2, '0');
+                    let min = String(d.getMinutes()).padStart(2, '0');
+                    let ss = String(d.getSeconds()).padStart(2, '0');
+                    return `${yyyy}/${mm}/${dd} ${hh}:${min}:${ss}`;
+                }
+            }
+            return str.replace('T', ' ').replace(/\.\d+Z$/, '').replace(/Z$/, '');
+        }
+
+        function formatTimeValue(val) {
+            if (!val) return "";
+            let str = String(val).trim();
+            if (str === "") return "";
+
+            if (/^\d{1,2}:\d{2}$/.test(str)) return str;
+
+            let match = str.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+            if (match) {
+                return `${match[1].padStart(2, '0')}:${match[2]}`;
+            }
+
+            let d = new Date(str);
+            if (!isNaN(d.getTime())) {
+                let h = String(d.getHours()).padStart(2, '0');
+                let m = String(d.getMinutes()).padStart(2, '0');
+                if (h !== "00" || m !== "00") return `${h}:${m}`;
+            }
+            return str;
+        }
+
+        // =========================================================
+        // システム1の処理
+        // =========================================================
+        async function downloadExcel1() {
+            showLoading("データを取得中...");
+            try {
+                const response = await fetch(WEB_APP_URL_1, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: "getCsv" })
+                });
+                const data = await parseJsonResponse(response);
+                hideLoading();
+
+                if (data.status === "success") {
+                    const csv = data.csv;
+                    if (!csv) { alert('データが存在しません。'); return; }
+
+                    showLoading("Excelファイルを生成中...");
+                    const rawRows = parseCSV(csv);
+                    const rows = [];
+
+                    for (let i = 0; i < rawRows.length; i++) {
+                        let r = [...rawRows[i]];
+                        if (i > 0) {
+                            if (r.length > 0) r[0] = formatTimestampValue(r[0]);
+                            if (r.length > 8) r[8] = formatTimeValue(r[8]);
+                        }
+                        rows.push(r);
+                    }
+
+                    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+                    const workbook = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(workbook, worksheet, "登録データ全体");
+
+                    const now = new Date();
+                    const fileName = `登録データ全体_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.xlsx`;
+
+                    hideLoading();
+                    XLSX.writeFile(workbook, fileName);
+                } else {
+                    alert('エラーが発生しました: ' + data.message);
+                }
+            } catch (error) {
+                hideLoading();
+                alert('通信エラーが発生しました: ' + error.message);
+            }
+        }
+
+        async function downloadCustomCsv1() {
+            showLoading("カスタムデータを生成中...");
+            try {
+                const response = await fetch(WEB_APP_URL_1, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: "getCsv" })
+                });
+                const data = await parseJsonResponse(response);
+                hideLoading();
+
+                if (data.status === "success") {
+                    const csv = data.csv;
+                    if (!csv) { alert('データが存在しません。'); return; }
+
+                    const parsedRows = parseCSV(csv);
+                    const newRows = [];
+
+                    for (let i = 0; i < parsedRows.length; i++) {
+                        const cols = parsedRows[i];
+                        if (cols.length >= 8) {
+                            newRows.push([cols[7] || '', cols[1] || ''].join(','));
+                        } else if (cols.length >= 2) {
+                            newRows.push([cols[cols.length - 1] || '', cols[1] || ''].join(','));
+                        }
+                    }
+
+                    const customCsvContent = newRows.join('\r\n');
+                    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), customCsvContent], {type: 'text/csv'});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'custom_filtered_data.csv';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                } else {
+                    alert('エラーが発生しました: ' + data.message);
+                }
+            } catch (error) {
+                hideLoading();
+                alert('通信エラーが発生しました: ' + error.message);
+            }
+        }
+
+        async function clearData1() {
+            const password = prompt('データを削除するにはパスワードを入力してください：');
+            if (password === null) return;
+            if (password !== CORRECT_PASSWORD) {
+                alert('パスワードが間違っています。');
+                return;
+            }
+
+            if (confirm('システム1のデータを本当に全て削除しますか？\nこの操作は元に戻せません。')) {
+                showLoading("データを削除中...");
+                try {
+                    const response = await fetch(WEB_APP_URL_1, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: "clearData", password: password })
+                    });
+                    const data = await parseJsonResponse(response);
+                    hideLoading();
+
+                    if (data.status === "success") {
+                        alert('削除が完了しました。');
+                    } else {
+                        alert('削除に失敗しました: ' + data.message);
+                    }
+                } catch (error) {
+                    hideLoading();
+                    alert('通信エラーが発生しました: ' + error.message);
+                }
+            }
+        }
+
+        // =========================================================
+        // システム2の処理
+        // =========================================================
+        async function downloadExcel2() {
+            const btn = document.getElementById('download-excel-btn-2');
+            showLoading("スプレッドシートからデータを取得中...");
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(WEB_APP_URL_2);
+                const result = await parseJsonResponse(response);
+
+                if (result.status === 'success') {
+                    const data = result.data;
+                    if (!data || data.length === 0) {
+                        hideLoading();
+                        alert('ダウンロードするデータが存在しません。');
+                        btn.disabled = false;
+                        return;
+                    }
+
+                    showLoading("Excelファイルを生成中...");
+                    const excelData = [EXCEL_HEADERS_2];
+
+                    let startIndex = 0;
+                    if (data.length > 0 && Array.isArray(data[0])) {
+                        const firstRow = data[0];
+                        if (String(firstRow[0]).includes("タイムスタンプ") ||
+                            String(firstRow[1]).includes("出展者") ||
+                            String(firstRow[2]).includes("見本市コード")) {
+                            startIndex = 1;
+                        }
+                    }
+
+                    for (let i = startIndex; i < data.length; i++) {
+                        const row = data[i];
+                        const newRow = [];
+                        for (let j = 0; j < 7; j++) {
+                            let val = (row && row[j] !== undefined && row[j] !== null) ? row[j] : "";
+                            if (j === 0) val = formatTimestampValue(val);
+                            newRow.push(val);
+                        }
+                        excelData.push(newRow);
+                    }
+
+                    const worksheet = XLSX.utils.aoa_to_sheet(excelData);
+                    worksheet["!cols"] = [{ wch: 22 }, { wch: 25 }, { wch: 18 }, { wch: 30 }, { wch: 30 }, { wch: 30 }, { wch: 40 }];
+
+                    const workbook = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(workbook, worksheet, "コミュニケーションデータ");
+
+                    const now = new Date();
+                    const fileName = `コミュニケーションデータ_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.xlsx`;
+
+                    hideLoading();
+                    XLSX.writeFile(workbook, fileName);
+                } else {
+                    hideLoading();
+                    alert('データ取得失敗: ' + result.message);
+                }
+            } catch (err) {
+                hideLoading();
+                alert('通信エラーが発生しました: ' + err.message);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function clearData2() {
+            const password = prompt('データを削除するにはパスワードを入力してください：');
+            if (password === null) return;
+
+            if (password !== CORRECT_PASSWORD) {
+                alert('パスワードが間違っています。');
+                return;
+            }
+
+            if (!confirm('システム2のスプレッドシートデータをすべて削除しますか？\nこの操作は元に戻せません。')) {
+                return;
+            }
+
+            const btn = document.getElementById('delete-excel-btn');
+            showLoading("データを削除中...");
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(WEB_APP_URL_2, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'clear', password: password })
+                });
+                const result = await parseJsonResponse(response);
+                hideLoading();
+
+                if (result.status === 'success') {
+                    alert('データをすべて削除しました。');
+                } else {
+                    alert('削除失敗: ' + result.message);
+                }
+            } catch (err) {
+                hideLoading();
+                alert('通信エラーが発生しました: ' + err.message);
+            } finally {
+                btn.disabled = false;
+            }
+        }
     </script>
-  </body>
+</body>
 </html>
