@@ -198,13 +198,13 @@
     <!-- スキャン1：QRコード ＆ 手動入力 -->
     <div id="screen-scan1" class="step-screen active">
         <h2>1. 出展社ＱＲコード読取</h2>
-        <p style="font-size: 0.9rem; color: #475569;">カメラでQRコードを読み取るか、直接コードを入力してください。</p>
+        <p style="font-size: 0.9rem; color: #475569;">カメラで自ブースのQRコードを読み取るか、直接コードを入力してください。</p>
         <div id="reader-1"></div>
         <button id="btn-start-scanner1" onclick="startScanner1()">📷 QRカメラを起動する</button>
 
         <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 16px;">
             <label style="font-size: 0.85rem; font-weight: bold; color: #475569;">出展社情報 (ＱＲコードが読めない時は手入力可):</label>
-            <input type="text" id="manual-code1" placeholder="例:エコール産業" value="">
+            <input type="text" id="manual-code1" placeholder="例:株式会社ナリサワ" value="">
             <button onclick="confirmCode1()">この内容で進む</button>
         </div>
     </div>
@@ -213,14 +213,14 @@
     <div id="screen-scan2" class="step-screen">
         <h2>2. 顧客コード読取</h2>
         <div class="info-badge">出展社: <span id="display-b1"></span></div>
-        <p style="font-size: 0.9rem; color: #475569;">カメラで顧客用QRコードを読み取るか、直接コードを入力してください。</p>
+        <p style="font-size: 0.9rem; color: #475569;">カメラで名札のQRコードを読み取るか、直接コードを入力してください。</p>
         
         <div id="reader-2"></div>
         
-        <button id="btn-start-scanner2" onclick="startScanner2()" style="background-color: #059669;">📷 顧客QRカメラを起動する</button>
+        <button id="btn-start-scanner2" onclick="startScanner2()" style="background-color: #059669;">📷 QRカメラを起動する</button>
 
         <label style="font-size: 0.85rem; font-weight: bold; color: #475569; margin-top: 16px; display: block;">抽出コード (読み取れない場合は手入力可):</label>
-        <input type="text" id="manual-code2" placeholder="見本市コード：XX9999999" value="">
+        <input type="text" id="manual-code2" placeholder="エントリー：A1B2C3D4E5" value="">
 
         <button onclick="confirmCode2()">このコードで進む</button>
         <button class="secondary" onclick="resetBarcode1()">最初からやり直す（出展社選択に戻る）</button>
