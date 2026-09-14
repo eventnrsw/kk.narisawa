@@ -89,7 +89,7 @@
         });
       }
 
-      // 個別CSVダウンロード処理（I列をA列に、B列をB列に並び替え）
+      // 個別CSVダウンロード処理（H列をA列に、B列をB列に並び替え）
       function downloadCustomCsv() {
         fetch(WEB_APP_URL, {
           method: 'POST',
@@ -111,19 +111,20 @@
             for (let i = 0; i < rows.length; i++) {
               if (!rows[i].trim()) continue;
               
-              // カンマ区切りでセルに分割（簡易的なパース）
+              // カンマ区切りでセルに分割
               const cols = rows[i].split(',');
               
-              // インデックス: A列=0, B列=1, I列=8 (0始まり)
-              if (cols.length >= 9) {
-                const valI = cols[8]; // I列
-                const valB = cols[1]; // B列
-                newRows.push([valI, valB].join(','));
+              // インデックス: B列=1, H列=7 (0始まり)
+              // スプレッドシートの構造: A=0, B=1(御社名), ..., H=7(登録ID)
+              if (cols.length >= 8) {
+                const valH = cols[7]; // H列（登録ID）
+                const valB = cols[1]; // B列（御社名）
+                newRows.push([valH, valB].join(','));
               } else if (cols.length >= 2) {
                 // 列数が足りない場合のフォールバック
                 const valB = cols[1] || '';
-                const valI = cols[cols.length - 1] || '';
-                newRows.push([valI, valB].join(','));
+                const valH = cols[cols.length - 1] || '';
+                newRows.push([valH, valB].join(','));
               }
             }
 
