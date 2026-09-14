@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>所感登録（QRスキャン対応版）</title>
+    <!-- QRコード読取用ライブラリ -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --border-color: #cbd5e1;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .container {
+            width: 100%;
+            max-width: 480px;
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            box-sizing: border-box;
+        }
+        .step-screen { display: none; }
+        .step-screen.active { display: block; }
+        h2 {
+            font-size: 1.15rem;
+            margin-top: 0;
+            color: #0f172a;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 8px;
+            line-height: 1.4;
+        }
+        .info-badge {
+            background: #eff6ff;
+            color: var(--primary-color);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+            border: 1px solid #bfdbfe;
+        }
+        #reader-1, #reader-2 {
+            width: 100% !important;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            margin-bottom: 12px;
+            background: #000;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 12px;
+            transition: background 0.2s;
+        }
+        button:active { background-color: var(--primary-hover); }
+        button.secondary { background-color: #64748b; }
+        button.secondary:active { background-color: #475569; }
+        button.warning { background-color: #d97706; }
+        button.warning:active { background-color: #b45309; }
+        
+        .summary-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid var(--primary-color);
+            padding: 10px 15px;
+            margin-bottom: 16px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            color: #555;
+        }
+        .summary-box div { margin-bottom: 4px; }
+        .summary-box div:last-child { margin-bottom: 0; }
+        
+        .star-rating {
+            display: flex;
+            gap: 10px;
+            font-size: 2.5rem;
+            cursor: pointer;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+        .star {
+            color: #ccc;
+            transition: color 0.2s;
+        }
+        .star.active {
+            color: #ffbb00;
+        }
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .checkbox-label input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+        .input-group {
+            margin-bottom: 16px;
+        }
+        .input-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #475569;
+            margin-bottom: 6px;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            box-sizing: border-box;
+            background-color: #ffffff;
+            color: #1e293b;
+        }
+        textarea { height: 120px; resize: vertical; }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+        .button-group button {
+            margin-top: 0;
+        }
+
+        #loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: bold;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #ffffff;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div id="loading-text">処理中...</div>
+    </div>
+
+<div class="container">
+    <!-- スキャン1：QRコード ＆ 手動入力 -->
+    <div id="screen-scan1" class="step-screen active">
+        <h2>1. 出展社ＱＲコード読取</h2>
+        <p style="font-size: 0.9rem; color: #475569;">カメラでQRコードを読み取るか、直接コードを入力してください。</p>
+        <div id="reader-1"></div>
+        <button id="btn-start-scanner1" onclick="startScanner1()">📷 QRカメラを起動する</button>
+
+        <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+            <label style="font-size: 0.85rem; font-weight: bold; color: #475569;">出展社情報 (ＱＲコードが読めない時は手入力可):</label>
+            <input type="text" id="manual-code1" placeholder="例:エコール産業" value="">
+            <button onclick="confirmCode1()">この内容で進む</button>
+        </div>
+    </div>
+
+    <!-- スキャン2：顧客コードQRスキャン -->
+    <div id="screen-scan2" class="step-screen">
+        <h2>2. 顧客コード読取</h2>
+        <div class="info-badge">出展社: <span id="display-b1"></span></div>
+        <p style="font-size: 0.9rem; color: #475569;">カメラで顧客用QRコードを読み取るか、直接コードを入力してください。</p>
+        
+        <div id="reader-2"></div>
+        
+        <button id="btn-start-scanner2" onclick="startScanner2()" style="background-color: #059669;">📷 顧客QRカメラを起動する</button>
+
+        <label style="font-size: 0.85rem; font-weight: bold; color: #475569; margin-top: 16px; display: block;">抽出コード (読み取れない場合は手入力可):</label>
+        <input type="text" id="manual-code2" placeholder="見本市コード：XX9999999" value="">
+
+        <button onclick="confirmCode2()">このコードで進む</button>
+        <button class="secondary" onclick="resetBarcode1()">最初からやり直す（出展社選択に戻る）</button>
+    </div>
+
+    <!-- アンケート ステップ1 (商品への関心度) -->
+    <div id="screen-q1" class="step-screen">
+        <div class="info-badge">出展社: <span class="disp-b1"></span><br>顧客コード: <span class="disp-b2"></span></div>
+        <h2>① ご販売店様の関心度を選択してください</h2>
+        <div class="star-rating" id="starContainer">
+            <span class="star" data-value="1">★</span>
+            <span class="star" data-value="2">★</span>
+            <span class="star" data-value="3">★</span>
+            <span class="star" data-value="4">★</span>
+            <span class="star" data-value="5">★</span>
+        </div>
+        <input type="hidden" id="interestLevel" value="0">
+        <button class="secondary" onclick="goToScreen('screen-scan2')">戻る</button>
+    </div>
+
+    <!-- アンケート ステップ2 (ご要望) -->
+    <div id="screen-q2" class="step-screen">
+        <div class="info-badge">出展社: <span class="disp-b1"></span><br>顧客コード: <span class="disp-b2"></span></div>
+        <div class="summary-box" id="summary-1"></div>
+        <h2>② 来場されたご販売店様からのご要望を選択してください。（複数選択可）</h2>
+        <div class="checkbox-group">
+            <label class="checkbox-label"><input type="checkbox" name="options" value="資料"> 資料</label>
+            <label class="checkbox-label"><input type="checkbox" name="options" value="デモ"> デモ</label>
+            <label class="checkbox-label"><input type="checkbox" name="options" value="勉強会"> 勉強会</label>
+            <label class="checkbox-label"><input type="checkbox" name="options" value="同行"> 同行</label>
+            <label class="checkbox-label"><input type="checkbox" name="options" value="見積"> 見積</label>
+            <label class="checkbox-label"><input type="checkbox" name="options" value="その他"> その他（次の画面で入力）</label>
+        </div>
+        <div class="button-group">
+            <button type="button" class="secondary" onclick="goToScreen('screen-q1')">戻る</button>
+            <button type="button" onclick="goToStep3()">次へ</button>
+        </div>
+    </div>
+
+    <!-- アンケート ステップ3 (商品名・特記事項) -->
+    <div id="screen-q3" class="step-screen">
+        <div class="info-badge">出展社: <span class="disp-b1"></span><br>顧客コード: <span class="disp-b2"></span></div>
+        <div class="summary-box" id="summary-2"></div>
+        <h2>③ 聞いた内容、注意点、担当者への伝達事項など必要に応じて入力してください</h2>
+        <div class="input-group">
+            <label for="productName">商品名</label>
+            <input type="text" id="productName" name="productName" placeholder="例：クラウドサービスＡ">
+        </div>
+        <div class="input-group">
+            <label for="notes">特記事項・申し送り</label>
+            <textarea id="notes" name="notes" placeholder="営業担当へ向けて具体的な要望や申し送り事項を入力してください"></textarea>
+        </div>
+        <div class="button-group">
+            <button type="button" class="secondary" onclick="goToScreen('screen-q2')">戻る</button>
+            <button type="button" onclick="goToPreview()" style="background-color: #059669;">確認画面へ</button>
+        </div>
+    </div>
+
+    <!-- プレビュー画面 -->
+    <div id="screen-preview" class="step-screen">
+        <div class="info-badge">出展社: <span class="disp-b1"></span><br>顧客コード: <span class="disp-b2"></span></div>
+        <h2>入力内容の確認</h2>
+        <div class="summary-box" style="border-left-color: #059669;">
+            <div style="margin-bottom: 6px;"><strong>関心度:</strong> <span id="prev-q1"></span></div>
+            <div style="margin-bottom: 6px;"><strong>ご要望:</strong> <span id="prev-q2"></span></div>
+            <div style="margin-bottom: 6px;"><strong>商品名:</strong> <span id="prev-product"></span></div>
+            <div><strong>特記事項:</strong> <span id="prev-notes"></span></div>
+        </div>
+        <button onclick="submitData()">データを登録する</button>
+        <button class="secondary" onclick="goToScreen('screen-q3')">修正する</button>
+    </div>
+</div>
+
+<script>
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwmQUWldL3pywGk1Um8sJI7Te_RPhEeUCK23Gg50GBAey_POp0_8uz9OeFzAi8guRun/exec';
+
+    let appData = { 
+        barcode1: '', 
+        barcode2: '', 
+        q1: '0', 
+        q2: '', 
+        q3: '', 
+        memo: '' 
+    };
+
+    let currentScreen = 'screen-scan1';
+    let html5QrCode1 = null;
+    let html5QrCode2 = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+        const savedScreen = sessionStorage.getItem('currentScreen');
+        const savedData = sessionStorage.getItem('appData');
+
+        if (savedScreen && savedData) {
+            appData = JSON.parse(savedData);
+            currentScreen = savedScreen;
+            document.getElementById('manual-code1').value = appData.barcode1 || '';
+            document.getElementById('manual-code2').value = appData.barcode2 || '';
+            document.getElementById('display-b1').innerText = appData.barcode1 || '';
+            document.getElementById('interestLevel').value = appData.q1 || '0';
+            document.getElementById('productName').value = appData.q3 || '';
+            document.getElementById('notes').value = appData.memo || '';
+            
+            if (appData.q2) {
+                const optArray = appData.q2.split(', ');
+                document.querySelectorAll('input[name="options"]').forEach(chk => {
+                    chk.checked = optArray.includes(chk.value);
+                });
+            }
+            updateStarDisplay(parseInt(appData.q1 || '0', 10));
+        } else {
+            currentScreen = 'screen-scan1';
+            saveState();
+        }
+        updateHeaderBadges();
+        goToScreen(currentScreen);
+    });
+
+    function saveState() {
+        appData.q3 = document.getElementById('productName').value;
+        appData.memo = document.getElementById('notes').value;
+        const selectedOptions = Array.from(document.querySelectorAll('input[name="options"]:checked')).map(el => el.value);
+        appData.q2 = selectedOptions.join(', ');
+        
+        sessionStorage.setItem('currentScreen', currentScreen);
+        sessionStorage.setItem('appData', JSON.stringify(appData));
+    }
+
+    function updateHeaderBadges() {
+        document.querySelectorAll('.disp-b1').forEach(el => el.innerText = appData.barcode1 || '(未取得)');
+        document.querySelectorAll('.disp-b2').forEach(el => el.innerText = appData.barcode2 || '(未取得)');
+    }
+
+    function stopAllCameras() {
+        if (html5QrCode1) {
+            try { if (html5QrCode1.isScanning) html5QrCode1.stop().catch(e => {}); } catch(e) {}
+        }
+        if (html5QrCode2) {
+            try { if (html5QrCode2.isScanning) html5QrCode2.stop().catch(e => {}); } catch(e) {}
+            document.getElementById('btn-start-scanner2').style.display = 'block';
+        }
+    }
+
+    function goToScreen(screenId) {
+        stopAllCameras();
+        currentScreen = screenId;
+        saveState();
+        updateHeaderBadges();
+
+        const starsCount = "★".repeat(Number(appData.q1)) + "☆".repeat(5 - Number(appData.q1));
+        const optionsText = appData.q2 ? appData.q2 : '未選択';
+
+        if (screenId === 'screen-q2') {
+            document.getElementById('summary-1').innerHTML = `<strong>関心度：</strong> ${starsCount} (${appData.q1}/5)`;
+        }
+        if (screenId === 'screen-q3') {
+            document.getElementById('summary-2').innerHTML = `<strong>関心度：</strong> ${starsCount} (${appData.q1}/5)<br><strong>ご要望：</strong> ${optionsText}`;
+        }
+        if (screenId === 'screen-preview') {
+            document.getElementById('prev-q1').innerText = `${starsCount} (${appData.q1}/5)`;
+            document.getElementById('prev-q2').innerText = optionsText;
+            document.getElementById('prev-product').innerText = appData.q3 || '(なし)';
+            document.getElementById('prev-notes').innerText = appData.memo || '(なし)';
+        }
+
+        document.querySelectorAll('.step-screen').forEach(el => el.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function startScanner1() {
+        const btn = document.getElementById('btn-start-scanner1');
+        btn.style.display = 'none';
+
+        if (!html5QrCode1) {
+            html5QrCode1 = new Html5Qrcode("reader-1");
+        }
+
+        html5QrCode1.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 }, formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ] },
+            (decodedText) => {
+                appData.barcode1 = decodedText;
+                document.getElementById('manual-code1').value = decodedText;
+                document.getElementById('display-b1').innerText = decodedText;
+                updateHeaderBadges();
+                
+                try { html5QrCode1.stop().catch(e => {}); } catch(e) {}
+
+                btn.style.display = 'block';
+                goToScreen('screen-scan2');
+            },
+            (err) => {}
+        ).catch(err => {
+            alert("カメラ起動エラー: " + err);
+            btn.style.display = 'block';
+        });
+    }
+
+    function confirmCode1() {
+        const val = document.getElementById('manual-code1').value.trim();
+        if (!val) {
+            alert('出展社コードが入力されていません。');
+            return;
+        }
+        appData.barcode1 = val;
+        document.getElementById('display-b1').innerText = val;
+        updateHeaderBadges();
+        saveState();
+        goToScreen('screen-scan2');
+    }
+
+    function startScanner2() {
+        const btnStart = document.getElementById('btn-start-scanner2');
+        btnStart.style.display = 'none';
+
+        if (!html5QrCode2) {
+            html5QrCode2 = new Html5Qrcode("reader-2");
+        }
+
+        html5QrCode2.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 }, formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ] },
+            (decodedText) => {
+                appData.barcode2 = decodedText;
+                document.getElementById('manual-code2').value = decodedText;
+                updateHeaderBadges();
+                
+                try { html5QrCode2.stop().catch(e => {}); } catch(e) {}
+
+                btnStart.style.display = 'block';
+                goToScreen('screen-q1');
+            },
+            (err) => {}
+        ).catch(err => {
+            alert("カメラ起動エラー: " + err);
+            btnStart.style.display = 'block';
+        });
+    }
+
+    function confirmCode2() {
+        const val = document.getElementById('manual-code2').value.trim();
+        if (!val) {
+            alert('顧客コードが入力されていません。');
+            return;
+        }
+        appData.barcode2 = val;
+        saveState();
+        updateHeaderBadges();
+        goToScreen('screen-q1');
+    }
+
+    function resetBarcode1() {
+        appData.barcode1 = '';
+        appData.barcode2 = '';
+        document.getElementById('manual-code1').value = '';
+        document.getElementById('manual-code2').value = '';
+        saveState();
+        goToScreen('screen-scan1');
+    }
+
+    const stars = document.querySelectorAll('.star');
+    const interestInput = document.getElementById('interestLevel');
+
+    stars.forEach((star, index) => {
+        star.addEventListener('click', () => {
+            const value = index + 1;
+            interestInput.value = value;
+            appData.q1 = String(value);
+            updateStarDisplay(value);
+            saveState();
+            goToScreen('screen-q2');
+        });
+    });
+
+    function updateStarDisplay(value) {
+        stars.forEach((s, i) => {
+            if (i < value) s.classList.add('active');
+            else s.classList.remove('active');
+        });
+    }
+
+    function goToStep3() {
+        saveState();
+        goToScreen('screen-q3');
+    }
+
+    function goToPreview() {
+        saveState();
+        if (!appData.barcode1) {
+            alert('情報が不足しています。最初からやり直してください。');
+            goToScreen('screen-scan1');
+            return;
+        }
+        goToScreen('screen-preview');
+    }
+
+    async function submitData() {
+        if (!appData.barcode1) {
+            alert('情報不足です。最初からやり直してください。');
+            goToScreen('screen-scan1');
+            return;
+        }
+        const overlay = document.getElementById('loading-overlay');
+        document.getElementById('loading-text').innerText = 'データを登録中...';
+        overlay.style.display = 'flex';
+
+        try {
+            const response = await fetch(GAS_URL, {
+                method: 'POST',
+                body: JSON.stringify(appData)
+            });
+            const result = await response.json();
+            overlay.style.display = 'none';
+
+            if(result.status === 'success') {
+                alert('データを登録しました！');
+                sessionStorage.clear();
+                appData = { barcode1: appData.barcode1, barcode2: '', q1: '0', q2: '', q3: '', memo: '' };
+                document.getElementById('manual-code2').value = '';
+                document.getElementById('productName').value = '';
+                document.getElementById('notes').value = '';
+                document.querySelectorAll('input[name="options"]').forEach(chk => chk.checked = false);
+                updateStarDisplay(0);
+                
+                document.getElementById('display-b1').innerText = appData.barcode1;
+                updateHeaderBadges();
+                goToScreen('screen-scan2');
+            } else {
+                alert('登録失敗: ' + result.message);
+            }
+        } catch (err) {
+            overlay.style.display = 'none';
+            alert('通信エラー: ' + err);
+        }
+    }
+</script>
+
+</body>
+</html>
