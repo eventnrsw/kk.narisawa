@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>アンケートフォーム</title>
+    <!-- QRコードリーダー用ライブラリ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; background: #f9f9f9; }
+        .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h2 { font-size: 20px; margin-top: 0; color: #333; }
+        label { display: block; margin-top: 15px; font-weight: bold; }
+        input[type="text"], textarea { width: 100%; padding: 10px; margin-top: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+        textarea { height: 120px; }
+        
+        .radio-group { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+        .radio-label { 
+            display: flex; align-items: flex-start; gap: 10px; font-weight: normal; 
+            padding: 10px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; background: #fff; transition: 0.2s;
+        }
+        .radio-label:hover { background: #f1f7ff; border-color: #007bff; }
+        .radio-label input { margin-top: 3px; transform: scale(1.2); }
+
+        .btn-container { display: flex; gap: 10px; margin-top: 25px; }
+        button { background: #007bff; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; flex: 1; }
+        button:hover { background: #0056b3; }
+        .secondary-btn { background: #6c757d; }
+        .secondary-btn:hover { background: #5a6268; }
+        .success-btn { background: #28a745; }
+        .success-btn:hover { background: #218838; }
+        .danger-btn { background: #dc3545; }
+        .danger-btn:hover { background: #c82333; }
+        
+        .step { display: none; }
+        .step.active { display: block; }
+        
+        .preview-box { background: #f1f3f5; padding: 15px; border-radius: 6px; margin-bottom: 15px; }
+        .preview-box p { margin: 8px 0; font-size: 15px; }
+
+        /* カメラリーダー表示エリア */
+        #reader { width: 100%; max-width: 400px; margin: 10px auto; display: none; }
+        #reader video { width: 100% !important; border-radius: 6px; }
+
+        /* グレーアウトローディング用 */
+        #loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5); display: none;
+            justify-content: center; align-items: center; z-index: 9999; color: white; font-size: 18px; font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ローディング用オーバーレイ -->
+    <div id="loading-overlay">登録中... しばらくお待ちください</div>
+
+    <div class="card">
+        <form id="survey-form">
+
+            <!-- ステップ 1: QRコード & カメラ読み取り -->
+            <div class="step active" id="step-1">
+                <h2>ステップ 1 / 3</h2>
+                <label for="qrCode">QRコード情報</label>
+                <input type="text" id="qrCode" name="qrCode" placeholder="カメラで読み取るか、手動で入力" required>
+                
+                <div style="margin-top: 15px; text-align: center;">
+                    <button type="button" id="start-camera-btn" class="success-btn">カメラでQRを読み込む</button>
+                    <div id="reader"></div>
+                    <button type="button" id="stop-camera-btn" class="danger-btn" style="display: none; margin-top: 10px;">カメラを停止する</button>
+                </div>
+
+                <div class="btn-container">
+                    <button type="button" onclick="nextStep(1)">次へ進む</button>
+                </div>
+            </div>
+
+            <!-- ステップ 2: 気になる商品 ＆ 熱意選択を統合 -->
+            <div class="step" id="step-2">
+                <h2>ステップ 2 / 3</h2>
+                
+                <label for="product">気になった商品は何ですか？</label>
+                <input type="text" id="product" name="product" placeholder="商品名を入力してください" required>
+
+                <label style="margin-top: 20px;">本日のご興味・ご要望をお聞かせください</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="rating" value="★★★★★ 具体的な相談をしたいので、一度話を聞きたい" required>
+                        <span><strong>★★★★★</strong><br>具体的な相談をしたいので、一度話を聞きたい</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="rating" value="★★★★☆ サービスの詳細説明を聞いてから検討したい">
+                        <span><strong>★★★★☆</strong><br>サービスの詳細説明を聞いてから検討したい</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="rating" value="★★★☆☆ 資料や事例を見て、まずは自分で検討してみたい">
+                        <span><strong>★★★☆☆</strong><br>資料や事例を見て、まずは自分で検討してみたい</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="rating" value="★★☆☆☆ 最新情報や案内があれば、たまに送ってほしい">
+                        <span><strong>★★☆☆☆</strong><br>最新情報や案内があれば、たまに送ってほしい</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="rating" value="★☆☆☆☆ 案内や連絡は不要である">
+                        <span><strong>★☆☆☆☆</strong><br>案内や連絡は不要である</span>
+                    </label>
+                </div>
+
+                <div class="btn-container">
+                    <button type="button" class="secondary-btn" onclick="prevStep(2)">戻る</button>
+                    <button type="button" onclick="nextStep(2)">次へ進む</button>
+                </div>
+            </div>
+
+            <!-- ステップ 3: 感想 -->
+            <div class="step" id="step-3">
+                <h2>ステップ 3 / 3</h2>
+                <label for="comment">ご自由にご感想を入力ください</label>
+                <textarea id="comment" name="comment" placeholder="イベントに関するご感想やご意見、担当営業への伝言などを自由にお書きください（任意）"></textarea>
+                <div class="btn-container">
+                    <button type="button" class="secondary-btn" onclick="prevStep(3)">戻る</button>
+                    <button type="button" onclick="showPreview()">確認画面へ進む</button>
+                </div>
+            </div>
+
+        </form>
+
+        <!-- 確認・プレビュー画面 -->
+        <div class="step" id="step-preview">
+            <h2>入力内容の確認</h2>
+            <div class="preview-box">
+                <p><strong>QRコード情報:</strong><br><span id="prev-qrCode"></span></p>
+                <p><strong>気になる商品:</strong><br><span id="prev-product"></span></p>
+                <p><strong>ご興味・ご要望:</strong><br><span id="prev-rating"></span></p>
+                <p><strong>ご感想:</strong><br><span id="prev-comment"></span></p>
+            </div>
+            <div class="btn-container">
+                <button type="button" class="secondary-btn" onclick="editForm()">修正する</button>
+                <button type="button" id="submit-btn" class="success-btn">スプレッドシートに登録</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ご指定のGASウェブアプリURL
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbwlBzHoQbQMXlpZWZmNEdpeuKIp5RdvTgREo_MP0KnwRzwp2rddCKPpkq3ceaYXnbGY/exec";
+
+        let html5QrCode = null;
+
+        // カメラ起動ボタン
+        document.getElementById('start-camera-btn').addEventListener('click', () => {
+            const readerDiv = document.getElementById('reader');
+            readerDiv.style.display = 'block';
+            document.getElementById('start-camera-btn').style.display = 'none';
+            document.getElementById('stop-camera-btn').style.display = 'inline-block';
+
+            html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start(
+                { facingMode: "environment" }, 
+                {
+                    fps: 10,    
+                    qrbox: { width: 250, height: 250 } 
+                },
+                (decodedText, decodedResult) => {
+                    document.getElementById('qrCode').value = decodedText;
+                    stopCamera();
+                    alert('QRコードを読み込みました！');
+                },
+                (errorMessage) => {}
+            ).catch(err => {
+                console.error("カメラ起動エラー:", err);
+                alert("カメラの起動に失敗しました。カメラの権限が許可されているか確認してください。");
+                stopCamera();
+            });
+        });
+
+        document.getElementById('stop-camera-btn').addEventListener('click', stopCamera);
+
+        function stopCamera() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                    document.getElementById('reader').style.display = 'none';
+                    document.getElementById('start-camera-btn').style.display = 'inline-block';
+                    document.getElementById('stop-camera-btn').style.display = 'none';
+                }).catch(err => {
+                    console.error("カメラ停止失敗:", err);
+                });
+            }
+        }
+
+        // 次へ進む時の制御
+        function nextStep(currentStepNum) {
+            if (currentStepNum === 1) {
+                stopCamera(); 
+            }
+
+            const currentStepEl = document.getElementById(`step-${currentStepNum}`);
+            const inputs = currentStepEl.querySelectorAll('input, textarea');
+            
+            let isValid = true;
+            inputs.forEach(input => {
+                if (!input.checkValidity()) {
+                    input.reportValidity();
+                    isValid = false;
+                }
+            });
+
+            if (!isValid) return;
+
+            currentStepEl.classList.remove('active');
+            document.getElementById(`step-${currentStepNum + 1}`).classList.add('active');
+            window.scrollTo(0, 0);
+        }
+
+        function prevStep(currentStepNum) {
+            document.getElementById(`step-${currentStepNum}`).classList.remove('active');
+            document.getElementById(`step-${currentStepNum - 1}`).classList.add('active');
+            window.scrollTo(0, 0);
+        }
+
+        function showPreview() {
+            const currentStepEl = document.getElementById('step-3');
+            const inputs = currentStepEl.querySelectorAll('input, textarea');
+            for (let input of inputs) {
+                if (!input.checkValidity()) {
+                    input.reportValidity();
+                    return;
+                }
+            }
+
+            document.getElementById('prev-qrCode').textContent = document.getElementById('qrCode').value;
+            document.getElementById('prev-product').textContent = document.getElementById('product').value;
+            document.getElementById('prev-rating').textContent = document.querySelector('input[name="rating"]:checked').value;
+            document.getElementById('prev-comment').textContent = document.getElementById('comment').value || "（なし）";
+
+            currentStepEl.classList.remove('active');
+            document.getElementById('step-preview').classList.add('active');
+            window.scrollTo(0, 0);
+        }
+
+        function editForm() {
+            document.getElementById('step-preview').classList.remove('active');
+            document.getElementById('step-1').classList.add('active');
+            window.scrollTo(0, 0);
+        }
+
+        // 最終登録ボタンクリック時
+        document.getElementById('submit-btn').addEventListener('click', async () => {
+            const loadingOverlay = document.getElementById('loading-overlay');
+            loadingOverlay.style.display = 'flex';
+
+            const formDataObj = {
+                qrCode: document.getElementById('qrCode').value,
+                product: document.getElementById('product').value,
+                rating: document.querySelector('input[name="rating"]:checked').value,
+                comment: document.getElementById('comment').value
+            };
+
+            try {
+                await fetch(GAS_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formDataObj)
+                });
+
+                alert('登録が完了しました。ご協力ありがとうございました！');
+                
+                document.getElementById('survey-form').reset();
+                document.getElementById('step-preview').classList.remove('active');
+                document.getElementById('step-1').classList.add('active');
+            } catch (error) {
+                console.error('Error:', error);
+                alert('登録中にエラーが発生しました。もう一度お試しください。');
+            } finally {
+                loadingOverlay.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
