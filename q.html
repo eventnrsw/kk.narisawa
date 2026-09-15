@@ -159,7 +159,7 @@
             html5QrCode.start(
                 { facingMode: "environment" }, 
                 {
-                    fps: 10,    
+                    fps: 10,   
                     qrbox: { width: 250, height: 250 } 
                 },
                 (decodedText, decodedResult) => {
@@ -175,25 +175,35 @@
             });
         });
 
-        document.getElementById('stop-camera-btn').addEventListener('click', stopCamera);
+        document.getElementById('stop-camera-btn').addEventListener('click', () => stopCamera());
 
+        // カメラ停止処理（Promise対応）
         function stopCamera() {
-            if (html5QrCode) {
-                html5QrCode.stop().then(() => {
-                    html5QrCode.clear();
-                    document.getElementById('reader').style.display = 'none';
-                    document.getElementById('start-camera-btn').style.display = 'inline-block';
-                    document.getElementById('stop-camera-btn').style.display = 'none';
-                }).catch(err => {
-                    console.error("カメラ停止失敗:", err);
-                });
-            }
+            return new Promise((resolve) => {
+                if (html5QrCode) {
+                    html5QrCode.stop().then(() => {
+                        html5QrCode.clear();
+                        document.getElementById('reader').style.display = 'none';
+                        document.getElementById('start-camera-btn').style.display = 'inline-block';
+                        document.getElementById('stop-camera-btn').style.display = 'none';
+                        html5QrCode = null;
+                        resolve();
+                    }).catch(err => {
+                        console.error("カメラ停止失敗:", err);
+                        html5QrCode = null;
+                        resolve();
+                    });
+                } else {
+                    resolve();
+                }
+            });
         }
 
-        // 次へ進む時の制御
-        function nextStep(currentStepNum) {
+        // 次へ進む時の制御（async/awaitに変更）
+        async function nextStep(currentStepNum) {
             if (currentStepNum === 1) {
-                stopCamera(); 
+                // カメラが動作中の場合は完全に停止するのを待つ
+                await stopCamera(); 
             }
 
             const currentStepEl = document.getElementById(`step-${currentStepNum}`);
